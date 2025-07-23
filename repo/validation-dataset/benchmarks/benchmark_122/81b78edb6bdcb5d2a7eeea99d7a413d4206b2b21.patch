@@ -1,0 +1,21 @@
+From 81b78edb6bdcb5d2a7eeea99d7a413d4206b2b21 Mon Sep 17 00:00:00 2001
+From: Kristian Bendiksen <kristian.bendiksen@gmail.com>
+Date: Mon, 3 Feb 2020 13:23:11 +0100
+Subject: [PATCH] #5455 Use openmp for nodal gradients calculation.
+
+---
+ .../GeoMech/GeoMechDataModel/RigFemPartResultsCollection.cpp     | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/ApplicationCode/GeoMech/GeoMechDataModel/RigFemPartResultsCollection.cpp b/ApplicationCode/GeoMech/GeoMechDataModel/RigFemPartResultsCollection.cpp
+index fe53f721240..f586dbe7e2e 100644
+--- a/ApplicationCode/GeoMech/GeoMechDataModel/RigFemPartResultsCollection.cpp
++++ b/ApplicationCode/GeoMech/GeoMechDataModel/RigFemPartResultsCollection.cpp
+@@ -1136,6 +1136,7 @@ RigFemScalarResultFrames* RigFemPartResultsCollection::calculateNodalGradients(
+ 
+         int elementCount = femPart->elementCount();
+ 
++#pragma omp parallel for schedule( dynamic )
+         for ( long nodeIdx = 0; nodeIdx < static_cast<long>( nodeCount ); nodeIdx++ )
+         {
+             const std::vector<int> elements = femPart->elementsUsingNode( nodeIdx );
