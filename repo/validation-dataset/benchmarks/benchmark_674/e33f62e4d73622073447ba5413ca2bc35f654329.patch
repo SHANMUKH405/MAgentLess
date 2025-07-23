@@ -1,0 +1,31 @@
+From e33f62e4d73622073447ba5413ca2bc35f654329 Mon Sep 17 00:00:00 2001
+From: Kyle Gerard Felker <kfelker@princeton.edu>
+Date: Tue, 21 Nov 2017 00:47:48 -0500
+Subject: [PATCH] Try to force outer-loop vectorization for EOS U(W)
+
+---
+ src/eos/adiabatic_hydro.cpp | 8 +++++---
+ 1 file changed, 5 insertions(+), 3 deletions(-)
+
+diff --git a/src/eos/adiabatic_hydro.cpp b/src/eos/adiabatic_hydro.cpp
+index 7de7391b85..52089659b7 100644
+--- a/src/eos/adiabatic_hydro.cpp
++++ b/src/eos/adiabatic_hydro.cpp
+@@ -104,12 +104,14 @@ void EquationOfState::PrimitiveToConserved(const AthenaArray<Real> &prim,
+   Real igm1 = 1.0/(GetGamma() - 1.0);
+ 
+   int nthreads = pmy_block_->pmy_mesh->GetNumMeshThreads();
+-#pragma omp parallel default(shared) num_threads(nthreads)
++  //#pragma omp parallel default(shared) num_threads(nthreads)
+ {
++  #pragma simd
+   for (int k=ks; k<=ke; ++k){
+-#pragma omp for schedule(dynamic)
++    //#pragma omp for schedule(dynamic)
+   for (int j=js; j<=je; ++j){
+-#pragma simd
++    //#pragma simd
++    #pragma novector
+     for (int i=is; i<=ie; ++i){
+       Real& u_d  = cons(IDN,k,j,i);
+       Real& u_m1 = cons(IM1,k,j,i);
