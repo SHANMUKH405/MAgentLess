@@ -2,14 +2,12 @@
 set -euxo pipefail
 
 #
-# 1) Load your OpenAI key + set up PYTHONPATH & model
+# 1) Set up PYTHONPATH (no API key needed for mock mode)
 #
-source script/api_key.sh
 export PYTHONPATH="$(pwd)"
-export OPENAI_MODEL=gpt-4o-mini-2024-07-18
 
 #
-# 2) Pick your one benchmark
+# 2) Pick your benchmark (can be changed)
 #
 export TARGET_ID=benchmark_674
 
@@ -64,17 +62,19 @@ for i in 1 2; do
 done
 
 #
-# 9) Run all localization & repair stages
+# 9) Run all localization & repair stages in MOCK MODE (no API calls)
 #
-./script/localization1.1.sh
-./script/localization1.2.sh
-./script/localization1.3.sh
-./script/localization1.4.sh
-./script/localization2.1.sh
-./script/localization3.1.sh
-./script/localization3.2.sh
+echo "Running localization stages in MOCK mode..."
+./script/localization1.1_mock.sh
+./script/localization1.2_mock.sh
+./script/localization1.3_mock.sh
+./script/localization1.4_mock.sh
+./script/localization2.1_mock.sh
+./script/localization3.1_mock.sh
+./script/localization3.2_mock.sh
 
-./script/repair.sh
+echo "Running repair stage in MOCK mode..."
+./script/repair_mock.sh
 
 #
 # 10) Rerank the two repair_sample outputs and pick a winner
@@ -88,4 +88,4 @@ python agentless/repair/rerank.py \
   --output_file results/${FOLDER_NAME}/final_patches.jsonl
 
 echo "✅ Done!  Final patch for ${TARGET_ID} → results/${FOLDER_NAME}/final_patches.jsonl"
-ls -lh results/${FOLDER_NAME}/final_patches.jsonl
+ls -lh results/${FOLDER_NAME}/final_patches.jsonl 

@@ -125,6 +125,20 @@ def transfer_arb_locs_to_locs(
     file_content="",
     verbose=False,
 ) -> tuple[list, list]:
+    # Handle C++ simple line ranges (e.g., "1-50")
+    if isinstance(locs, list) and len(locs) > 0 and isinstance(locs[0], str) and "-" in locs[0]:
+        line_loc = []
+        context_intervals = []
+        for loc_str in locs:
+            if "-" in loc_str:
+                try:
+                    start, end = map(int, loc_str.split("-"))
+                    line_loc.append((start, end))
+                    context_intervals.append((max(1, start - context_window), end + context_window))
+                except ValueError:
+                    continue
+        return line_loc, context_intervals
+    
     if structure is None:
         class_info, function_names, file_lines = parse_python_file("", file_content)
         structure = {}
@@ -146,7 +160,15 @@ def transfer_arb_locs_to_locs(
 
     for model_pred_locs in locs:
         current_class_name = ""
-        for loc in model_pred_locs.splitlines():
+        # Handle both string and list inputs for C++ compatibility
+        if isinstance(model_pred_locs, str):
+            loc_lines = model_pred_locs.splitlines()
+        elif isinstance(model_pred_locs, list):
+            loc_lines = model_pred_locs
+        else:
+            continue
+            
+        for loc in loc_lines:
             # handle cases like "class: MyClass.my_method"
             if loc.startswith("class: ") and "." not in loc:
                 loc = loc[len("class: ") :].strip()
@@ -386,11 +408,13 @@ def compile_gt_locations(gt_location: dict) -> tuple[list, set, set, set]:
 
 def show_project_structure(structure, spacing=0) -> str:
     """pprint the project structure"""
+    from agentless.multilang.const import LANGUAGE
 
     pp_string = ""
 
     for key, value in structure.items():
-        if "." in key and not end_with_ext(key.strip()):
+        # Skip filtering for non-Python languages
+        if LANGUAGE == 'python' and "." in key and not end_with_ext(key.strip()):
             continue  # skip none python files
         if "." in key:
             pp_string += " " * spacing + str(key) + "\n"
@@ -412,6 +436,12 @@ def filter_out_test_files(structure):
 
 
 def filter_none_python(structure):
+    from agentless.multilang.const import LANGUAGE
+    
+    # Skip filtering for non-Python languages
+    if LANGUAGE != 'python':
+        return
+        
     for key, value in list(structure.items()):
         if (
             not "functions" in value.keys()

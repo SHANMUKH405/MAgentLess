@@ -9,6 +9,12 @@ from agentless.util.api_requests import (
     request_chatgpt_engine,
 )
 
+# Import OllamaDecoder at the end to avoid circular imports
+try:
+    from .ollama_decoder import OllamaDecoder
+except ImportError:
+    OllamaDecoder = None
+
 
 class DecoderBase(ABC):
     def __init__(
@@ -399,6 +405,16 @@ def make_model(
         )
     elif backend == "deepseek":
         return DeepSeekChatDecoder(
+            name=model,
+            logger=logger,
+            batch_size=batch_size,
+            max_new_tokens=max_tokens,
+            temperature=temperature,
+        )
+    elif backend == "ollama":
+        if OllamaDecoder is None:
+            raise NotImplementedError("OllamaDecoder not available")
+        return OllamaDecoder(
             name=model,
             logger=logger,
             batch_size=batch_size,

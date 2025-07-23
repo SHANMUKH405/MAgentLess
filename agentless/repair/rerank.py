@@ -20,46 +20,69 @@ def _load_results(args):
     interval = intervals[0]
     for i in range(interval[0], interval[1] + 1):
         for _, root in enumerate(roots):
-            patches = load_jsonl(root / f"output_{i}_normalized.jsonl")
+            normalized_file = root / f"output_{i}_normalized.jsonl"
+            if not os.path.exists(normalized_file):
+                print(f"Warning: {normalized_file} does not exist, skipping...")
+                continue
+                
+            patches = load_jsonl(normalized_file)
+            if not patches:
+                print(f"Warning: {normalized_file} is empty, skipping...")
+                continue
+                
             print(
-                f"Loaded {len(patches)} patches from {root / f'output_{i}_normalized.jsonl'}"
+                f"Loaded {len(patches)} patches from {normalized_file}"
             )
             if args.regression:
-                regression_test_results = load_jsonl(
-                    root / f"output_{i}_regression_test_results.jsonl"
-                )
+                regression_file = root / f"output_{i}_regression_test_results.jsonl"
+                if os.path.exists(regression_file):
+                    regression_test_results = load_jsonl(regression_file)
+                else:
+                    regression_test_results = []
             if args.reproduction:
-                reproduction_test_results = load_jsonl(
-                    root / f"output_{i}_reproduction_test_results.jsonl"
-                )
+                reproduction_file = root / f"output_{i}_reproduction_test_results.jsonl"
+                if os.path.exists(reproduction_file):
+                    reproduction_test_results = load_jsonl(reproduction_file)
+                else:
+                    reproduction_test_results = []
 
             for patch in patches[:]:
                 if args.regression:
-                    regression_test_result = [
-                        x
-                        for x in regression_test_results
-                        if x["instance_id"] == patch["instance_id"]
-                    ][0].get("regression", [0] * 10000)
-                    regression_test_result = len(regression_test_result)
+                    if regression_test_results:
+                        regression_test_result = [
+                            x
+                            for x in regression_test_results
+                            if x["instance_id"] == patch["instance_id"]
+                        ]
+                        if regression_test_result:
+                            regression_test_result = regression_test_result[0].get("regression", [0] * 10000)
+                            regression_test_result = len(regression_test_result)
+                        else:
+                            regression_test_result = 0
+                    else:
+                        regression_test_result = 0
                 else:
                     regression_test_result = 0
 
                 if args.reproduction:
-                    if (
-                        len(
-                            [
+                    if reproduction_test_results:
+                        if (
+                            len(
+                                [
+                                    x
+                                    for x in reproduction_test_results
+                                    if x["instance_id"] == patch["instance_id"]
+                                ]
+                            )
+                            == 1
+                        ):
+                            reproduction_test_result = [
                                 x
                                 for x in reproduction_test_results
                                 if x["instance_id"] == patch["instance_id"]
-                            ]
-                        )
-                        == 1
-                    ):
-                        reproduction_test_result = [
-                            x
-                            for x in reproduction_test_results
-                            if x["instance_id"] == patch["instance_id"]
-                        ][0].get("reproduction", False)
+                            ][0].get("reproduction", False)
+                        else:
+                            reproduction_test_result = False
                     else:
                         reproduction_test_result = False
                 else:
@@ -156,6 +179,10 @@ def modified_length(normalized_patch):
 def majority_voting(args):
 
     with open(args.output_file, "w") as f:
+        # If no execution results, create empty output
+        if not execution_results:
+            print("Warning: No patches found, creating empty output file")
+            return
 
         for instance_id in execution_results:
             if len(execution_results[instance_id]) < args.num_samples:
@@ -230,19 +257,27 @@ def majority_voting(args):
                             vote[patch_key] += 1
                             if patch_key not in first_appear_idx:
                                 first_appear_idx[patch_key] = i
-                    maj_selected_id = max(
-                        valid_indices,
-                        key=lambda i: (
-                            vote[patch_keys[i]],
-                            -first_appear_idx[patch_keys[i]],
-                        ),
-                    )
-                    patch = get_sample(instance_id, maj_selected_id)["patch"]
-                    result = {
-                        "model_name_or_path": "agentless",
-                        "instance_id": instance_id,
-                        "model_patch": patch,
-                    }
+                    if valid_indices:
+                        maj_selected_id = max(
+                            valid_indices,
+                            key=lambda i: (
+                                vote[patch_keys[i]],
+                                -first_appear_idx[patch_keys[i]],
+                            ),
+                        )
+                        patch = get_sample(instance_id, maj_selected_id)["patch"]
+                        result = {
+                            "model_name_or_path": "agentless",
+                            "instance_id": instance_id,
+                            "model_patch": patch,
+                        }
+                    else:
+                        print(f"No valid patches found for {instance_id}")
+                        result = {
+                            "model_name_or_path": "agentless",
+                            "instance_id": instance_id,
+                            "model_patch": "",
+                        }
                 else:
                     print(f"No raw patches valid for {instance_id}")
                     result = {
@@ -300,7 +335,19 @@ def normalize_patches(args):
             if os.path.exists(output_folder / f"output_{i}_normalized.jsonl"):
                 # skip
                 continue
-            patches = load_jsonl(output_folder / f"output_{i}_processed.jsonl")
+            
+            # Check if the processed file exists, if not create an empty one
+            processed_file = output_folder / f"output_{i}_processed.jsonl"
+            if not os.path.exists(processed_file):
+                # Create empty processed file
+                with open(processed_file, "w") as f:
+                    pass
+                continue
+                
+            patches = load_jsonl(processed_file)
+            if not patches:  # If patches is empty, skip
+                continue
+                
             for d in patches:
                 instance_id = d["instance_id"]
                 patch = d["model_patch"]
